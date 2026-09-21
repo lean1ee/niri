@@ -1699,12 +1699,76 @@ impl<W: LayoutElement> ScrollingSpace<W> {
         self.columns[self.active_column_idx].focus_bottom()
     }
 
-    pub fn move_column_to_index(&mut self, index: usize) {
+    pub fn move_column_to_index(&mut self, index: usize, window: Option<&W::Id>) {
         if self.columns.is_empty() {
             return;
         }
 
-        self.move_column_to(index.saturating_sub(1).min(self.columns.len() - 1));
+        let target_idx = index.saturating_sub(1).min(self.columns.len() - 1);
+        let src_idx = if let Some(window) = window {
+            let Some((col_idx, _)) = self
+                .columns
+                .iter()
+                .enumerate()
+                .find(|(_, col)| col.contains(window))
+            else {
+                return;
+            };
+            col_idx
+        } else {
+            self.active_column_idx
+        };
+
+        if src_idx == self.active_column_idx {
+            self.move_column_to(target_idx);
+        } else {
+            self.move_inactive_column_to(src_idx, target_idx);
+        }
+    }
+
+    fn move_inactive_column_to(&mut self, src_idx: usize, new_idx: usize) {
+        if src_idx == new_idx {
+            return;
+        }
+
+        let active_idx_before = self.active_column_idx;
+        let current_active_col_x = self.column_x(active_idx_before);
+        let current_col_x = self.column_x(src_idx);
+        let next_col_x = self.column_x(src_idx + 1);
+
+        let mut column = self.columns.remove(src_idx);
+        let data = self.data.remove(src_idx);
+        cancel_resize_for_column(&mut self.interactive_resize, &mut column);
+        self.columns.insert(new_idx, column);
+        self.data.insert(new_idx, data);
+
+        // Update active_column_idx since columns shifted
+        if src_idx < active_idx_before && new_idx >= active_idx_before {
+            self.active_column_idx -= 1;
+        } else if src_idx > active_idx_before && new_idx <= active_idx_before {
+            self.active_column_idx += 1;
+        }
+
+        // Preserve camera viewport position so active column stays at the same screen location.
+        let new_active_col_x = self.column_x(self.active_column_idx);
+        let view_offset_delta = -new_active_col_x + current_active_col_x;
+        self.view_offset.offset(view_offset_delta);
+
+        // Animate the moved column to its new position.
+        let new_col_x = self.column_x(new_idx);
+        self.columns[new_idx].animate_move_x_from(current_col_x - new_col_x);
+
+        // All columns in between moved by the width of the column that we just moved.
+        let others_x_offset = next_col_x - current_col_x;
+        if src_idx < new_idx {
+            for col in &mut self.columns[src_idx..new_idx] {
+                col.animate_move_x_from(others_x_offset);
+            }
+        } else {
+            for col in &mut self.columns[new_idx + 1..=src_idx] {
+                col.animate_move_x_from(-others_x_offset);
+            }
+        }
     }
 
     fn move_column_to(&mut self, new_idx: usize) {

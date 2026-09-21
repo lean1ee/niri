@@ -1857,11 +1857,23 @@ impl<W: LayoutElement> Layout<W> {
         true
     }
 
-    pub fn move_column_to_index(&mut self, index: usize) {
-        let Some(workspace) = self.active_workspace_mut() else {
+    pub fn move_column_to_index(&mut self, index: usize, window: Option<&W::Id>) {
+        if let Some(InteractiveMoveState::Moving(move_)) = &mut self.interactive_move {
+            if window.is_none() || window == Some(move_.tile.window().id()) {
+                return;
+            }
+        }
+
+        let workspace = if let Some(window) = window {
+            self.workspaces_mut().find(|ws| ws.has_window(window))
+        } else {
+            self.active_workspace_mut()
+        };
+
+        let Some(workspace) = workspace else {
             return;
         };
-        workspace.move_column_to_index(index);
+        workspace.move_column_to_index(index, window);
     }
 
     pub fn move_down(&mut self) {

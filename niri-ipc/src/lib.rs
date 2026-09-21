@@ -405,6 +405,11 @@ pub enum Action {
         /// The index starts from 1 for the first column.
         #[cfg_attr(feature = "clap", arg())]
         index: usize,
+        /// Id of the window in the column to move.
+        ///
+        /// If `None`, uses the focused column.
+        #[cfg_attr(feature = "clap", arg(long))]
+        id: Option<u64>,
     },
     /// Move the focused window down in a column.
     MoveWindowDown {},

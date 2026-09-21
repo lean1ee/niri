@@ -493,7 +493,12 @@ enum Op {
     MoveColumnToLast,
     MoveColumnLeftOrToMonitorLeft(#[proptest(strategy = "1..=2u8")] u8),
     MoveColumnRightOrToMonitorRight(#[proptest(strategy = "1..=2u8")] u8),
-    MoveColumnToIndex(#[proptest(strategy = "1..=5usize")] usize),
+    MoveColumnToIndex {
+        #[proptest(strategy = "proptest::option::of(1..=5usize)")]
+        id: Option<usize>,
+        #[proptest(strategy = "1..=5usize")]
+        index: usize,
+    },
     MoveWindowDown,
     MoveWindowUp,
     MoveWindowDownOrToWorkspaceDown,
@@ -1155,7 +1160,10 @@ impl Op {
 
                 layout.move_column_right_or_to_output(&output);
             }
-            Op::MoveColumnToIndex(index) => layout.move_column_to_index(index),
+            Op::MoveColumnToIndex { id, index } => {
+                let id = id.filter(|id| layout.has_window(id));
+                layout.move_column_to_index(index, id.as_ref());
+            }
             Op::MoveWindowDown => layout.move_down(),
             Op::MoveWindowUp => layout.move_up(),
             Op::MoveWindowDownOrToWorkspaceDown => layout.move_down_or_to_workspace_down(),
@@ -3336,6 +3344,34 @@ fn removing_window_above_preserves_focused_window() {
     let layout = check_ops(ops);
     let win = layout.focus().unwrap();
     assert_eq!(win.0.id, 1);
+}
+
+#[test]
+fn move_column_by_id_preserves_focus_and_order() {
+    let ops = [
+        Op::AddOutput(0),
+        Op::AddWindow {
+            params: TestWindowParams::new(1),
+        },
+        Op::AddWindow {
+            params: TestWindowParams::new(2),
+        },
+        Op::AddWindow {
+            params: TestWindowParams::new(3),
+        },
+        Op::FocusWindow(1),
+        Op::MoveColumnToIndex {
+            id: Some(3),
+            index: 1,
+        },
+    ];
+
+    let layout = check_ops(ops);
+    let focused = layout.focus().unwrap();
+    assert_eq!(focused.0.id, 1);
+
+    let window_ids: Vec<usize> = layout.windows().map(|(_, win)| win.0.id).collect();
+    assert_eq!(window_ids, vec![3, 1, 2]);
 }
 
 #[test]

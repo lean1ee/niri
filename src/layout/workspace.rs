@@ -1073,11 +1073,11 @@ impl<W: LayoutElement> Workspace<W> {
         self.scrolling.move_column_to_last();
     }
 
-    pub fn move_column_to_index(&mut self, index: usize) {
+    pub fn move_column_to_index(&mut self, index: usize, window: Option<&W::Id>) {
         if self.floating_is_active.get() {
             return;
         }
-        self.scrolling.move_column_to_index(index);
+        self.scrolling.move_column_to_index(index, window);
     }
 
     pub fn move_down(&mut self) -> bool {

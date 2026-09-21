@@ -1463,10 +1463,19 @@ impl State {
                 }
             }
             Action::MoveColumnToIndex(idx) => {
-                self.niri.layout.move_column_to_index(idx);
+                self.niri.layout.move_column_to_index(idx, None);
                 self.maybe_warp_cursor_to_focus();
                 // FIXME: granular
                 self.niri.queue_redraw_all();
+            }
+            Action::MoveColumnToIndexById { index, id } => {
+                let window = self.niri.layout.windows().find(|(_, m)| m.id().get() == id);
+                let window = window.map(|(_, m)| m.window.clone());
+                if let Some(window) = window {
+                    self.niri.layout.move_column_to_index(index, Some(&window));
+                    // FIXME: granular
+                    self.niri.queue_redraw_all();
+                }
             }
             Action::FocusWorkspaceDown => {
                 self.niri.layout.switch_workspace_down();
